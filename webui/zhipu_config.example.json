@@ -1,0 +1,18 @@
+{
+  "_说明": "把它改名为 zhipu_config.json 放在同一目录（webui/）即可启用「智谱 GLM 视觉理解」（公式 → LaTeX）。此文件含密钥，不要提交到 git。",
+  "_字段": {
+    "enabled": "总开关。false 则界面上的「智谱 GLM」选项不可选",
+    "api_key": "智谱开放平台（open.bigmodel.cn）→ API Keys 里复制，形如 xxxxxxxx.xxxxxxxx",
+    "model": "glm-4v-flash(免费,输出上限1024;撞上限会自动续写) / glm-4v-plus(付费·公式更强,上限8192) / glm-4.5v(旗舰·最强,上限16384)",
+    "prompt": "留空则用内置的「数学笔记转写」提示词；也可自定义",
+    "max_tokens": "输出上限。0=按模型自动（flash→1024 / plus→8192 / 4.5v→16384）；填错会被接口拒绝",
+    "rotate": "图片方向。auto=自动判断并摆正（默认，会多花一次调用）——竖版/横版、倒置/侧躺都能处理；也可直接填 0/90/180/270（顺时针度数）手动指定"
+  },
+
+  "enabled": true,
+  "api_key": "",
+  "model": "glm-4v-flash",
+  "prompt": "",
+  "max_tokens": 0,
+  "rotate": "auto"
+}

@@ -1,22 +1,22 @@
 # MarkItDown
 
 > [!TIP]
-> MarkItDown is a Python package and command-line utility for converting various files to Markdown (e.g., for indexing, text analysis, etc).
+> MarkItDown 是一个 Python 包和命令行工具，用于将各种文件转换为 Markdown（例如用于索引、文本分析等）。
 >
-> For more information, and full documentation, see the project [README.md](https://github.com/microsoft/markitdown) on GitHub.
+> 更多信息及完整文档，请参阅 GitHub 上的项目 [README.md](https://github.com/microsoft/markitdown)。
 
 > [!IMPORTANT]
-> MarkItDown performs I/O with the privileges of the current process. Like open() or requests.get(), it will access resources that the process itself can access. Sanitize your inputs in untrusted environments, and call the narrowest `convert_*` function needed for your use case (e.g., `convert_stream()`, or `convert_local()`). See the [Security Considerations](https://github.com/microsoft/markitdown#security-considerations) section of the documentation for more information.
+> MarkItDown 会以当前进程的权限执行 I/O 操作。与 `open()` 或 `requests.get()` 类似，它会访问当前进程本身有权访问的资源。在不可信环境中使用时，请对输入进行安全处理，并仅调用满足你使用场景的最窄 `convert_*` 函数（例如 `convert_stream()` 或 `convert_local()`）。更多信息请参阅文档中的[安全注意事项](https://github.com/microsoft/markitdown#security-considerations)部分。
 
-## Installation
+## 安装
 
-From PyPI:
+从 PyPI 安装：
 
 ```bash
 pip install 'markitdown[all]'
 ```
 
-From source:
+从源码安装：
 
 ```bash
 git clone git@github.com:microsoft/markitdown.git
@@ -24,9 +24,9 @@ cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
-## Usage
+## 使用方法
 
-### Command-Line
+### 命令行
 
 ```bash
 markitdown path-to-file.pdf > document.md
@@ -42,14 +42,10 @@ result = md.convert("test.xlsx")
 print(result.text_content)
 ```
 
-### More Information
+### 更多信息
 
-For more information, and full documentation, see the project [README.md](https://github.com/microsoft/markitdown) on GitHub.
+更多信息及完整文档，请参阅 GitHub 上的项目 [README.md](https://github.com/microsoft/markitdown)。
 
-## Trademarks
+## 商标
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+本项目可能包含项目、产品或服务的商标或标识。Microsoft 商标或标识的授权使用须遵守并遵循 [Microsoft 商标与品牌指南](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general)。在本项目的修改版本中使用 Microsoft 商标或标识时，不得引起混淆或暗示 Microsoft 赞助。任何第三方商标或标识的使用均受相应第三方政策约束。

@@ -166,3 +166,14 @@ cython_debug/
 src/.DS_Store
 .DS_Store
 .cursorrules
+
+# MarkItDown Web 界面的转换产物
+output/
+
+# 含真实密钥的本地配置（绝不提交）
+# 复制 *.example.json 改名为正式文件名，填入自己的密钥即可
+webui/tencent_config.json
+webui/zhipu_config.json
+
+# 误产物：PPT 转 Markdown 的测试残留（含 base64 图片，体积巨大）
+er.md

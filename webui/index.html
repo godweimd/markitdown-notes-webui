@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MarkItDown 转换器</title>
+<style>
+  :root{
+    --bg:#f2f4f7;
+    --panel:#ffffff;
+    --panel-2:#fafbfc;
+    --border:#e2e6eb;
+    --border-strong:#d3d9e0;
+    --text:#1b1f24;
+    --muted:#6b7280;
+    --muted-2:#9aa3ad;
+    --accent:#2563eb;
+    --accent-soft:#eaf1ff;
+    --accent-dark:#1d4ed8;
+    --ok:#15803d;
+    --ok-soft:#e8f6ed;
+    --err:#c0392b;
+    --err-soft:#fdecea;
+    --radius:12px;
+    --mono:"Cascadia Code","JetBrains Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    font-size:14px;
+    line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header{
+    height:58px;
+    background:var(--panel);
+    border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:12px;
+    padding:0 20px;
+    position:sticky;top:0;z-index:20;
+  }
+  .logo{
+    width:30px;height:30px;border-radius:8px;
+    background:linear-gradient(135deg,#3b82f6,#1e40af);
+    color:#fff;font-weight:700;font-size:15px;
+    display:flex;align-items:center;justify-content:center;
+    letter-spacing:-.5px;
+  }
+  header h1{font-size:15.5px;margin:0;font-weight:650;letter-spacing:.2px;}
+  header h1 span{color:var(--muted);font-weight:400;font-size:12.5px;margin-left:8px;}
+  .badge{
+    font-size:11.5px;padding:2px 9px;border-radius:20px;
+    background:var(--accent-soft);color:var(--accent-dark);
+    border:1px solid #cfe0ff;font-weight:600;
+  }
+  .spacer{flex:1;}
+  .status-dot{
+    width:8px;height:8px;border-radius:50%;background:var(--muted-2);
+    display:inline-block;margin-right:6px;transition:background .3s;
+  }
+  .status-dot.on{background:#22c55e;box-shadow:0 0 0 3px #22c55e22;}
+  #serviceStatus{font-size:12.5px;color:var(--muted);display:flex;align-items:center;}
+
+  /* ---------- 布局 ---------- */
+  main{
+    display:grid;
+    grid-template-columns:minmax(340px,420px) 1fr;
+    gap:16px;
+    padding:16px 20px 28px;
+    max-width:1560px;margin:0 auto;
+    align-items:start;
+  }
+  @media(max-width:1000px){ main{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .panel-head{
+    display:flex;align-items:center;gap:8px;
+    padding:11px 14px;border-bottom:1px solid var(--border);
+    background:var(--panel-2);
+  }
+  .panel-head h2{font-size:13px;margin:0;font-weight:650;color:#374151;letter-spacing:.3px;}
+  .panel-body{padding:14px;}
+
+  /* ---------- Tab 切换 ---------- */
+  .tabs{display:flex;gap:4px;background:#eef1f5;padding:3px;border-radius:9px;}
+  .tabs button{
+    flex:1;border:0;background:transparent;cursor:pointer;
+    padding:6px 12px;border-radius:7px;font-size:12.5px;
+    color:var(--muted);font-weight:600;font-family:inherit;
+    transition:.15s;
+  }
+  .tabs button.active{background:#fff;color:var(--text);box-shadow:0 1px 2px #0000000f;}
+  .tabs button:hover:not(.active){color:var(--text);}
+
+  /* ---------- 拖拽区 ---------- */
+  #drop{
+    border:2px dashed var(--border-strong);
+    border-radius:var(--radius);
+    padding:34px 18px;
+    text-align:center;
+    cursor:pointer;
+    transition:.18s;
+    background:var(--panel-2);
+  }
+  #drop:hover{border-color:var(--accent);background:var(--accent-soft);}
+  #drop.drag{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.005);}
+  #drop .ico{font-size:32px;line-height:1;margin-bottom:10px;}
+  #drop .big{font-size:13.5px;font-weight:600;}
+  #drop .small{font-size:12px;color:var(--muted);margin-top:5px;}
+
+  .file-card{
+    display:none;margin-top:12px;
+    border:1px solid var(--border);border-radius:10px;
+    padding:11px 12px;background:var(--panel-2);
+    display:flex;align-items:center;gap:10px;
+  }
+  .file-card .fi{
+    width:34px;height:34px;border-radius:8px;flex:0 0 auto;
+    background:var(--accent-soft);color:var(--accent-dark);
+    display:flex;align-items:center;justify-content:center;
+    font-size:10.5px;font-weight:700;text-transform:uppercase;
+  }
+  .file-card .fn{flex:1;min-width:0;}
+  .file-card .name{
+    font-size:12.5px;font-weight:600;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .file-card .meta{font-size:11.5px;color:var(--muted);}
+  .icon-btn{
+    border:0;background:transparent;cursor:pointer;color:var(--muted);
+    font-size:16px;padding:4px 6px;border-radius:6px;line-height:1;font-family:inherit;
+  }
+  .icon-btn:hover{background:#e9edf2;color:var(--text);}
+
+  /* ---------- 表单 ---------- */
+  label.field{display:block;font-size:12.5px;font-weight:600;color:#374151;margin:0 0 6px;}
+  input[type=url],input[type=text]{
+    width:100%;padding:9px 11px;border:1px solid var(--border-strong);
+    border-radius:9px;font-size:13px;font-family:inherit;
+    background:#fff;color:var(--text);outline:none;transition:.15s;
+  }
+  input[type=url]:focus,input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px #2563eb1f;}
+
+  .hint{font-size:11.5px;color:var(--muted);margin-top:6px;}
+
+  .options{margin-top:16px;border-top:1px solid var(--border);padding-top:13px;}
+  .opt-title{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.4px;margin-bottom:9px;}
+  .switch{display:flex;align-items:flex-start;gap:9px;padding:7px 0;cursor:pointer;}
+  .switch input{margin:2px 0 0;width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto;}
+  .switch .t{font-size:12.5px;font-weight:600;}
+  .switch .d{font-size:11.5px;color:var(--muted);}
+  .opt-sub{margin:-2px 0 6px 24px;display:flex;gap:6px;}
+  .opt-sub select{
+    width:100%;padding:6px 8px;border:1px solid var(--border-strong);
+    border-radius:8px;background:#fff;color:#24292f;font-size:12.5px;
+    font-family:inherit;cursor:pointer;flex:1;min-width:0;
+  }
+  .opt-sub select:disabled{opacity:.5;cursor:not-allowed;}
+  .tag-new{
+    display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;
+    font-size:10.5px;font-weight:700;vertical-align:1px;
+    background:var(--ok-soft);color:var(--ok);border:1px solid #bfe3cb;
+  }
+  .ocr-badge{
+    display:inline-flex;align-items:center;gap:4px;
+    padding:2px 9px;border-radius:20px;font-size:11px;font-weight:650;
+    background:var(--ok-soft);color:var(--ok);border:1px solid #bfe3cb;
+  }
+  .img-badge{
+    display:inline-flex;align-items:center;gap:4px;
+    padding:2px 9px;border-radius:20px;font-size:11px;font-weight:650;
+    background:var(--accent-soft);color:var(--accent-dark);border:1px solid #cfe0ff;
+  }
+  /* 插图资源条 */
+  .asset-strip{
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+    margin:0 0 18px;padding:10px 12px;border-radius:10px;
+    background:var(--panel-2);border:1px solid var(--border);
+  }
+  .asset-strip .lb{font-size:12px;font-weight:650;color:var(--muted);margin-right:2px;}
+  .asset-strip a{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;
+    background:#fff;border:1px solid var(--border-strong);
+    color:var(--accent-dark);text-decoration:none;
+  }
+  .asset-strip a:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .asset-strip img{
+    width:26px;height:26px;object-fit:cover;border-radius:5px;
+    border:1px solid var(--border);
+  }
+  /* 输出目录提示条 */
+  .out-dir{
+    display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+    margin:0 0 18px;padding:9px 12px;border-radius:10px;
+    background:#f6fbf8;border:1px solid #cbe7d5;
+  }
+  .out-dir .lb{font-size:12px;font-weight:650;color:var(--ok);}
+  .out-dir code{
+    font-family:var(--mono);font-size:11.5px;color:#24292f;
+    background:#fff;border:1px solid var(--border);border-radius:6px;
+    padding:2px 8px;word-break:break-all;
+  }
+  .out-dir .tool-btn{padding:3px 10px;font-size:11.5px;}
+
+  .btn{
+    width:100%;margin-top:16px;padding:11px 14px;border:0;border-radius:10px;
+    background:var(--accent);color:#fff;font-size:13.5px;font-weight:650;
+    cursor:pointer;font-family:inherit;transition:.15s;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .btn:hover:not(:disabled){background:var(--accent-dark);}
+  .btn:disabled{opacity:.55;cursor:not-allowed;}
+  .spinner{
+    width:14px;height:14px;border:2px solid #ffffff66;border-top-color:#fff;
+    border-radius:50%;animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ---------- 输出区 ---------- */
+  .out-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .out-toolbar .tabs{width:190px;}
+  .tool-btn{
+    border:1px solid var(--border-strong);background:#fff;color:#374151;
+    padding:5px 11px;border-radius:8px;font-size:12px;font-weight:600;
+    cursor:pointer;font-family:inherit;transition:.15s;
+  }
+  .tool-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent-dark);background:var(--accent-soft);}
+  .tool-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .stats{font-size:11.5px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;margin-left:auto;}
+
+  .out-body{
+    min-height:520px;max-height:calc(100vh - 200px);
+    overflow:auto;padding:20px 22px;
+  }
+  .placeholder{
+    height:480px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:10px;
+    color:var(--muted-2);text-align:center;
+  }
+  .placeholder .ico{font-size:40px;opacity:.6;}
+  .placeholder .t{font-size:13.5px;font-weight:600;color:var(--muted);}
+
+  /* 空白结果说明卡片 */
+  .empty-state{
+    max-width:580px;margin:34px auto 0;text-align:center;
+    border:1px dashed var(--border-strong);border-radius:12px;
+    background:var(--panel-2);padding:26px 26px 22px;
+  }
+  .empty-state .ico{font-size:38px;line-height:1;margin-bottom:12px;}
+  .empty-state .t{font-size:14.5px;font-weight:650;color:#b45309;margin-bottom:10px;}
+  .empty-state .d{font-size:13px;color:var(--muted);line-height:1.75;text-align:left;}
+  .empty-state .d b{color:var(--text);word-break:break-all;}
+  .empty-state ul{margin:12px 0 0;padding-left:20px;text-align:left;font-size:12.5px;color:var(--muted);line-height:1.85;}
+  .empty-state li{margin:3px 0;}
+  .empty-state code{
+    font-family:var(--mono);font-size:.9em;background:#eef1f5;
+    padding:.1em .4em;border-radius:4px;color:#b4326b;
+  }
+  .empty-state .tips{
+    margin-top:16px;padding:11px 14px;border-radius:9px;text-align:left;
+    background:#fffbeb;border:1px solid #fde68a;font-size:12.5px;color:#92400e;line-height:1.75;
+  }
+
+  /* markdown 渲染样式 */
+  .md{font-size:14.5px;color:#22272e;word-wrap:break-word;}
+  .md > *:first-child{margin-top:0;}
+  .md h1,.md h2,.md h3,.md h4,.md h5,.md h6{
+    margin:1.5em 0 .6em;font-weight:650;line-height:1.35;color:#14181d;
+  }
+  .md h1{font-size:1.72em;border-bottom:1px solid var(--border);padding-bottom:.3em;}
+  .md h2{font-size:1.4em;border-bottom:1px solid var(--border);padding-bottom:.28em;}
+  .md h3{font-size:1.18em;}
+  .md h4{font-size:1.03em;}
+  .md p{margin:.75em 0;}
+  .md a{color:var(--accent);text-decoration:none;border-bottom:1px solid #2563eb33;}
+  .md a:hover{border-bottom-color:var(--accent);}
+  .md code{
+    font-family:var(--mono);font-size:.875em;
+    background:#eef1f5;padding:.15em .42em;border-radius:5px;color:#b4326b;
+  }
+  .md pre{
+    background:#f7f8fa;border:1px solid var(--border);border-radius:10px;
+    padding:13px 15px;overflow:auto;margin:1em 0;
+  }
+  .md pre code{background:none;padding:0;color:#24292f;font-size:12.8px;line-height:1.6;}
+  .md blockquote{
+    margin:1em 0;padding:.5em 1em;color:#57606a;
+    border-left:3px solid #d0d7de;background:#f9fafb;border-radius:0 6px 6px 0;
+  }
+  .md blockquote > *:first-child{margin-top:.2em;}
+  .md blockquote > *:last-child{margin-bottom:.2em;}
+  .md ul,.md ol{margin:.7em 0;padding-left:1.9em;}
+  .md li{margin:.28em 0;}
+  .md hr{border:0;border-top:1px solid var(--border);margin:1.6em 0;}
+  .md table{border-collapse:collapse;margin:1em 0;font-size:13px;display:block;overflow:auto;max-width:100%;}
+  .md th,.md td{border:1px solid var(--border-strong);padding:7px 12px;text-align:left;}
+  .md th{background:#f3f5f8;font-weight:650;}
+  .md tr:nth-child(even) td{background:#fafbfc;}
+  .md img{max-width:100%;border-radius:8px;border:1px solid var(--border);}
+  .md del{color:var(--muted);}
+
+  .raw{
+    font-family:var(--mono);font-size:12.8px;line-height:1.65;
+    white-space:pre-wrap;word-break:break-word;color:#24292f;margin:0;
+  }
+
+  .alert{
+    display:none;margin:0 0 14px;padding:12px 15px;border-radius:10px;
+    background:var(--err-soft);border:1px solid #f5c6c2;color:#8c2b21;font-size:13px;
+  }
+  .alert b{display:block;margin-bottom:4px;color:var(--err);}
+  .alert.warn{background:#fff8e6;border-color:#f2d999;color:#7a5506;}
+  .alert.warn b{color:#9a6a00;}
+  .alert pre{
+    margin:8px 0 0;font-size:11.5px;font-family:var(--mono);
+    white-space:pre-wrap;max-height:180px;overflow:auto;color:#7a3329;opacity:.85;
+  }
+
+  .toast{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(14px);
+    background:#1f2937;color:#fff;padding:10px 20px;border-radius:9px;
+    font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:99;
+    box-shadow:0 8px 24px #00000026;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .formats{
+    margin-top:14px;display:flex;flex-wrap:wrap;gap:5px;
+  }
+  .formats span{
+    font-size:11px;padding:2.5px 8px;border-radius:6px;
+    background:#f1f4f8;color:var(--muted);border:1px solid var(--border);
+  }
+  .hide{display:none !important;}
+</style>
+<!-- 公式渲染：让 Markdown 里的 $...$ / $$...$$ LaTeX 在预览里直接显示成数学排版 -->
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']]
+    },
+    options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="logo">M↓</div>
+  <h1>MarkItDown 转换器 <span>把各种文件转成 Markdown</span></h1>
+  <span class="badge" id="verBadge">v-</span>
+  <div class="spacer"></div>
+  <div id="serviceStatus"><span class="status-dot" id="dot"></span><span id="statusText">连接中…</span></div>
+</header>
+
+<main>
+  <!-- ============ 左侧：输入 ============ -->
+  <section class="panel">
+    <div class="panel-head"><h2>① 选择来源</h2></div>
+    <div class="panel-body">
+
+      <div class="tabs" style="margin-bottom:14px;">
+        <button id="tabFile" class="active">上传文件</button>
+        <button id="tabUrl">输入网址</button>
+      </div>
+
+      <!-- 文件 -->
+      <div id="paneFile">
+        <div id="drop">
+          <div class="ico">📄</div>
+          <div class="big">拖拽文件到这里</div>
+          <div class="small">或点击选择文件 · 也支持 Ctrl+V 粘贴</div>
+        </div>
+        <input type="file" id="fileInput" class="hide" multiple />
+
+        <div class="file-card" id="fileCard">
+          <div class="fi" id="fileExt">?</div>
+          <div class="fn">
+            <div class="name" id="fileName">-</div>
+            <div class="meta" id="fileMeta">-</div>
+          </div>
+          <button class="icon-btn" id="clearFile" title="移除">✕</button>
+        </div>
+
+        <div class="formats">
+          <span>PDF</span><span>Word</span><span>PPT</span><span>Excel</span>
+          <span>图片</span><span>音频</span><span>HTML</span><span>CSV/JSON/XML</span>
+          <span>ZIP</span><span>EPub</span><span>IPYNB</span><span>Outlook</span>
+        </div>
+      </div>
+
+      <!-- 网址 -->
+      <div id="paneUrl" class="hide">
+        <label class="field" for="urlInput">网页 / 文档 / YouTube 链接</label>
+        <input type="url" id="urlInput" placeholder="https://example.com/article  或  https://youtu.be/xxxx" />
+        <div class="hint">支持 http、https 链接，以及 YouTube 视频字幕抓取。</div>
+      </div>
+
+      <!-- 选项 -->
+      <div class="options">
+        <div class="opt-title">转换选项</div>
+        <label class="switch">
+          <input type="checkbox" id="optKeepData" />
+          <span>
+            <span class="t">保留内嵌图片数据</span>
+            <span class="d">默认会截断 base64 图片，勾选后输出体积会明显变大</span>
+          </span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="optPlugins" />
+          <span>
+            <span class="t">启用第三方插件</span>
+            <span class="d">加载已安装的 markitdown 插件转换器</span>
+          </span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="optOcr" checked />
+          <span>
+            <span class="t">扫描件自动 OCR<span class="tag-new" id="ocrEngineTag">本地离线</span></span>
+            <span class="d" id="ocrEngineDesc">没有文字层的 PDF / 图片自动识别文字，无需联网</span>
+          </span>
+        </label>
+        <div class="opt-sub">
+          <select id="ocrEngine" title="选择识别引擎">
+            <option value="auto">自动：云端优先，失败回落本地</option>
+            <option value="local">仅本地：离线识别，隐私优先</option>
+            <option value="cloud">仅云端：腾讯云，精度优先</option>
+            <option value="vl">智谱 GLM-4V：公式转 LaTeX，手写笔记首选</option>
+          </select>
+          <select id="ocrModel" title="选择智谱模型（仅「智谱 GLM-4V」模式生效）" class="hide">
+            <option value="glm-4v-flash">GLM-4V-Flash（免费）</option>
+            <option value="glm-4v-plus">GLM-4V-Plus（付费·公式更强）</option>
+            <option value="glm-4.5v">GLM-4.5V（旗舰·最强）</option>
+          </select>
+        </div>
+        <label class="switch" id="optSeparateRow">
+          <input type="checkbox" id="optSeparate" checked />
+          <span>
+            <span class="t">批量时分别保存<span class="tag-new">新</span></span>
+            <span class="d">多文件时每个文件各自生成独立的 .md，而不是合并成一个</span>
+          </span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="optKeepImages" checked />
+          <span>
+            <span class="t">保留文档内插图<span class="tag-new">新</span></span>
+            <span class="d">把 PDF 里的截图 / 图片原样导出成文件并在 Markdown 中引用，只识别插图之外的文字（例如手写笔记）</span>
+          </span>
+        </label>
+      </div>
+
+      <button class="btn" id="convertBtn">
+        <span id="btnLabel">开始转换</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 右侧：输出 ============ -->
+  <section class="panel">
+    <div class="panel-head">
+      <div class="out-toolbar">
+        <div class="tabs">
+          <button id="tabPreview" class="active">预览</button>
+          <button id="tabRaw">Markdown 源码</button>
+        </div>
+        <button class="tool-btn" id="copyBtn" disabled>复制</button>
+        <button class="tool-btn" id="downloadBtn" disabled>下载 .md</button>
+        <div class="stats">
+          <span id="statOcr"></span>
+          <span id="statImg"></span>
+          <span id="statChars"></span>
+          <span id="statLines"></span>
+          <span id="statTime"></span>
+        </div>
+      </div>
+    </div>
+    <div class="out-body" id="outBody">
+      <div class="alert" id="alertBox"><b id="alertTitle"></b><span id="alertMsg"></span><pre id="alertDetail"></pre></div>
+      <div class="alert warn" id="warnBox"><b id="warnTitle"></b><span id="warnMsg"></span></div>
+      <div class="asset-strip hide" id="assetStrip"></div>
+      <div class="out-dir hide" id="outDirBar">
+        <span class="lb">✓ 已保存到</span>
+        <code id="outDirPath"></code>
+        <button class="tool-btn" id="openFolderBtn">打开文件夹</button>
+      </div>
+      <div class="placeholder" id="placeholder">
+        <div class="ico">📝</div>
+        <div class="t">转换结果会显示在这里</div>
+        <div style="font-size:12.5px;">左侧选好文件或网址，点「开始转换」</div>
+      </div>
+      <div id="previewPane" class="md hide"></div>
+      <pre id="rawPane" class="raw hide"></pre>
+
+      <div class="empty-state hide" id="emptyPane">
+        <div class="ico">📭</div>
+        <div class="t">转换完成，但没有提取到任何文本</div>
+        <div class="d" id="emptyDesc"></div>
+        <ul>
+          <li>图片 / 扫描件 PDF —— 本身没有文字层，MarkItDown 默认不做 OCR</li>
+          <li>音频文件 —— 需要系统里配置好可用的语音识别后端</li>
+          <li>文件本身是空的，或内容全部藏在图片里</li>
+        </ul>
+        <div class="tips" id="emptyTip"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- 元素 ---------------- */
+  const $ = id => document.getElementById(id);
+  const tabFile=$("tabFile"), tabUrl=$("tabUrl");
+  const paneFile=$("paneFile"), paneUrl=$("paneUrl");
+  const drop=$("drop"), fileInput=$("fileInput");
+  const fileCard=$("fileCard"), fileName=$("fileName"), fileMeta=$("fileMeta"), fileExt=$("fileExt");
+  const clearFile=$("clearFile"), urlInput=$("urlInput");
+  const optKeepData=$("optKeepData"), optPlugins=$("optPlugins"), optOcr=$("optOcr"), optKeepImages=$("optKeepImages");
+  const optSeparate=$("optSeparate"), optSeparateRow=$("optSeparateRow");
+  const ocrEngine=$("ocrEngine"), ocrModel=$("ocrModel");
+  const convertBtn=$("convertBtn"), btnLabel=$("btnLabel");
+  const tabPreview=$("tabPreview"), tabRaw=$("tabRaw");
+  const previewPane=$("previewPane"), rawPane=$("rawPane"), placeholder=$("placeholder");
+  const emptyPane=$("emptyPane"), emptyDesc=$("emptyDesc"), emptyTip=$("emptyTip");
+  const copyBtn=$("copyBtn"), downloadBtn=$("downloadBtn");
+  const statChars=$("statChars"), statLines=$("statLines"), statTime=$("statTime"), statOcr=$("statOcr"), statImg=$("statImg");
+  const assetStrip=$("assetStrip");
+  const outDirBar=$("outDirBar"), outDirPath=$("outDirPath"), openFolderBtn=$("openFolderBtn");
+  const alertBox=$("alertBox"), alertTitle=$("alertTitle"), alertMsg=$("alertMsg"), alertDetail=$("alertDetail");
+  const warnBox=$("warnBox"), warnTitle=$("warnTitle"), warnMsg=$("warnMsg");
+  const toast=$("toast"), verBadge=$("verBadge"), dot=$("dot"), statusText=$("statusText");
+  const ocrEngineTag=$("ocrEngineTag"), ocrEngineDesc=$("ocrEngineDesc");
+
+  let currentFile = null;      // 待转换的文件（单文件）
+  let currentFiles = [];       // 待转换的文件列表（批量）
+  let currentMarkdown = "";    // 最近一次转换结果
+  let currentName = "output";
+  let currentCid = null;       // 带图片结果的缓存 id
+  let currentAssets = [];      // 本次导出的插图
+  let busy = false;
+  let hasResult = false;       // 是否已经有过一次成功的转换
+  let isEmptyResult = false;   // 转换成功但内容为空
+
+  /* ---------------- 工具 ---------------- */
+  function fmtSize(n){
+    if(n < 1024) return n + " B";
+    if(n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+    return (n/1024/1024).toFixed(2) + " MB";
+  }
+  function toastMsg(msg){
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>toast.classList.remove("show"), 1600);
+  }
+  function esc(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  /* 让预览里的 LaTeX 公式渲染成数学排版（MathJax 异步加载完成后再排版） */
+  function typesetMath(){
+    if(!window.MathJax || !MathJax.typesetPromise) return;
+    const run = function(){ MathJax.typesetPromise([previewPane]).catch(function(){}); };
+    if(MathJax.startup && MathJax.startup.promise){
+      MathJax.startup.promise.then(run).catch(function(){});
+    } else {
+      run();
+    }
+  }
+  /* OCR 引擎的展示名：tencent / local / zhipu / none */
+  function engineLabel(engine){
+    if(engine === "tencent") return "腾讯云 OCR";
+    if(engine === "local") return "本地 OCR";
+    if(engine === "zhipu") return "智谱 GLM-4V";
+    return "OCR";
+  }
+  /* 根据后端返回的引擎信息，更新左侧选项的说明文字 */
+  function applyEngine(info){
+    const e = (info && info.ocr_engine) || "none";
+    const t = (info && info.ocr_info && info.ocr_info.tencent) || {};
+    const z = (info && info.ocr_info && info.ocr_info.zhipu) || {};
+    const av = (info && info.ocr_info && info.ocr_info.available) || {};
+    if(e === "tencent"){
+      ocrEngineTag.textContent = "腾讯云";
+      ocrEngineTag.style.background = "var(--accent-soft)";
+      ocrEngineTag.style.color = "var(--accent-dark)";
+      ocrEngineTag.style.borderColor = "#cfe0ff";
+      ocrEngineTag.title = "腾讯云 OCR · " + (t.api_name || "");
+      ocrEngineDesc.textContent = "没有文字层的 PDF / 图片调用腾讯云「" +
+        (t.api_name || "通用文字识别") + "」识别文字（区域 " + (t.region || "-") + "）" +
+        (av.vl ? "；数学公式请在下拉框选「智谱 GLM-4V」" : "");
+    } else if(e === "local"){
+      ocrEngineTag.textContent = "本地离线";
+      ocrEngineTag.title = "RapidOCR 本地离线识别";
+      ocrEngineDesc.textContent = "没有文字层的 PDF / 图片自动识别文字，无需联网";
+    } else if(e === "zhipu" || av.vl){
+      ocrEngineTag.textContent = "智谱 GLM";
+      ocrEngineTag.style.background = "var(--accent-soft)";
+      ocrEngineTag.style.color = "var(--accent-dark)";
+      ocrEngineTag.style.borderColor = "#cfe0ff";
+      ocrEngineTag.title = "智谱 " + (z.model_name || "GLM-4V") + " 视觉理解";
+      ocrEngineDesc.textContent = "用智谱「" + (z.model_name || "GLM-4V") +
+        "」整页理解内容，数学公式转成 LaTeX 代码，适合手写笔记";
+    } else {
+      ocrEngineTag.textContent = "不可用";
+      ocrEngineTag.title = "未检测到可用的 OCR 引擎";
+      ocrEngineDesc.textContent = "本地依赖缺失，且未配置云 OCR，扫描件将无法识别文字";
+    }
+
+    /* 按后端可用性禁用无效选项，避免选到用不了的引擎 */
+    Array.prototype.forEach.call(ocrEngine.options, function(o){
+      o.disabled = (av[o.value] === false);
+    });
+    if(ocrEngine.options[ocrEngine.selectedIndex] && ocrEngine.options[ocrEngine.selectedIndex].disabled){
+      ocrEngine.value = "auto";
+    }
+
+    /* 填充智谱模型下拉框（后端返回的候选列表），并把当前模型设为选中 */
+    if(z && Array.isArray(z.models) && z.models.length){
+      const cur = z.model;
+      ocrModel.innerHTML = "";
+      z.models.forEach(function(m){
+        const op = document.createElement("option");
+        op.value = m.value;
+        op.textContent = m.label;
+        if(m.value === cur) op.selected = true;
+        ocrModel.appendChild(op);
+      });
+    }
+
+    syncOcrControls();
+  }
+  /* OCR 总开关关掉时，引擎下拉框一并置灰；模型框只在「智谱 GLM」模式显示 */
+  function syncOcrControls(){
+    ocrEngine.disabled = !optOcr.checked;
+    const isVl = optOcr.checked && ocrEngine.value === "vl";
+    ocrModel.disabled = !isVl;
+    ocrModel.classList.toggle("hide", !isVl);
+  }
+  optOcr.addEventListener("change", syncOcrControls);
+  ocrEngine.addEventListener("change", syncOcrControls);
+
+  /* ---------------- 极简 Markdown 渲染 ---------------- */
+  function inline(text){
+    let t = esc(text);
+    t = t.replace(/`([^`]+)`/g, (m,c)=> "<code>"+c+"</code>");
+    t = t.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g,
+        (m,alt,src,tt)=> '<img src="'+src+'" alt="'+alt+'"'+(tt?' title="'+tt+'"':'')+'>');
+    t = t.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g,
+        (m,txt,url,tt)=> '<a href="'+url+'" target="_blank" rel="noopener"'+(tt?' title="'+tt+'"':'')+'>'+txt+'</a>');
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+    t = t.replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+    t = t.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+    t = t.replace(/(^|[\s(])(https?:\/\/[^\s<>()]+)/g,
+        (m,p,u)=> p + '<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>');
+    return t;
+  }
+
+  const RE_HR      = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
+  const RE_HEAD    = /^\s{0,3}(#{1,6})\s+(.*)$/;
+  const RE_QUOTE   = /^\s{0,3}>\s?(.*)$/;
+  const RE_UL      = /^(\s*)([-*+])\s+(.*)$/;
+  const RE_OL      = /^(\s*)(\d+)[.)]\s+(.*)$/;
+  const RE_TSEP    = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+  function isTableRow(s){ return s.indexOf("|") !== -1; }
+  function splitRow(s){
+    let r = s.trim();
+    if(r.startsWith("|")) r = r.slice(1);
+    if(r.endsWith("|")) r = r.slice(0,-1);
+    return r.split("|").map(c=>c.trim());
+  }
+  function startsBlock(s){
+    return RE_HEAD.test(s)||RE_HR.test(s)||RE_QUOTE.test(s)||
+           RE_UL.test(s)||RE_OL.test(s)||/^\s*```/.test(s);
+  }
+
+  function renderList(lines, start, ordered){
+    // 按缩进构建（最多支持 3 层）
+    const items = [];
+    const stack = [];   // {indent, children:[]}
+    let i = start;
+    const re = ordered ? RE_OL : RE_UL;
+    let baseIndent = null;
+
+    while(i < lines.length){
+      const line = lines[i];
+      if(/^\s*$/.test(line)){ i++; continue; }
+      const m = line.match(re);
+      if(!m) break;
+      const indent = m[1].length;
+      if(baseIndent === null) baseIndent = indent;
+      if(indent < baseIndent) break;
+      const content = m[3];
+      const depth = Math.max(0, Math.min(2, Math.round((indent - baseIndent)/2)));
+      const node = { depth, content, children: [] };
+      // 挂到合适的父节点
+      while(stack.length && stack[stack.length-1].depth >= depth) stack.pop();
+      if(stack.length) stack[stack.length-1].children.push(node);
+      else items.push(node);
+      stack.push(node);
+      i++;
+    }
+
+    function build(list, ord){
+      let html = ord ? "<ol>" : "<ul>";
+      list.forEach(n=>{
+        html += "<li>" + inline(n.content);
+        if(n.children.length) html += build(n.children, ord);
+        html += "</li>";
+      });
+      return html + (ord ? "</ol>" : "</ul>");
+    }
+    return { html: build(items, ordered), next: i };
+  }
+
+  function renderMarkdown(md){
+    const lines = String(md).replace(/\r\n?/g,"\n").split("\n");
+    let out = "";
+    let i = 0;
+
+    while(i < lines.length){
+      const line = lines[i];
+
+      // 空行
+      if(/^\s*$/.test(line)){ i++; continue; }
+
+      // 代码块
+      const fence = line.match(/^\s*```\s*([\w+-]*)\s*$/);
+      if(fence){
+        const lang = fence[1];
+        const buf = [];
+        i++;
+        while(i < lines.length && !/^\s*```/.test(lines[i])){ buf.push(lines[i]); i++; }
+        i++; // 跳过结束 ```
+        out += '<pre><code'+(lang?' class="language-'+esc(lang)+'"':'')+'>'+
+               esc(buf.join("\n"))+'</code></pre>';
+        continue;
+      }
+
+      // 标题
+      const h = line.match(RE_HEAD);
+      if(h){
+        const lv = h[1].length;
+        out += "<h"+lv+">"+inline(h[2].trim())+"</h"+lv+">";
+        i++; continue;
+      }
+
+      // 分隔线
+      if(RE_HR.test(line)){ out += "<hr>"; i++; continue; }
+
+      // 表格
+      if(isTableRow(line) && i+1 < lines.length && RE_TSEP.test(lines[i+1])){
+        const head = splitRow(line);
+        i += 2;
+        const rows = [];
+        while(i < lines.length && isTableRow(lines[i]) && !/^\s*$/.test(lines[i])){
+          rows.push(splitRow(lines[i])); i++;
+        }
+        let html = "<table><thead><tr>";
+        head.forEach(c=> html += "<th>"+inline(c)+"</th>");
+        html += "</tr></thead><tbody>";
+        rows.forEach(r=>{
+          html += "<tr>";
+          for(let k=0;k<head.length;k++) html += "<td>"+inline(r[k]||"")+"</td>";
+          html += "</tr>";
+        });
+        out += html + "</tbody></table>";
+        continue;
+      }
+
+      // 引用
+      if(RE_QUOTE.test(line)){
+        const buf = [];
+        while(i < lines.length && (RE_QUOTE.test(lines[i]) || /^\s*$/.test(lines[i]))){
+          if(/^\s*$/.test(lines[i]) && !(i+1<lines.length && RE_QUOTE.test(lines[i+1]))) break;
+          const q = lines[i].match(RE_QUOTE);
+          buf.push(q ? q[1] : "");
+          i++;
+        }
+        out += "<blockquote>" + renderMarkdown(buf.join("\n")) + "</blockquote>";
+        continue;
+      }
+
+      // 列表
+      if(RE_UL.test(line) || RE_OL.test(line)){
+        const ordered = RE_OL.test(line);
+        const r = renderList(lines, i, ordered);
+        out += r.html;
+        i = r.next;
+        continue;
+      }
+
+      // 段落
+      const buf = [];
+      while(i < lines.length && !/^\s*$/.test(lines[i]) && !startsBlock(lines[i])
+            && !(isTableRow(lines[i]) && i+1<lines.length && RE_TSEP.test(lines[i+1]))){
+        buf.push(lines[i]); i++;
+      }
+      if(buf.length){
+        out += "<p>" + buf.map(inline).join("<br>") + "</p>";
+      } else { i++; }
+    }
+    return out;
+  }
+
+  /* ---------------- Tab 逻辑 ---------------- */
+  function setSourceTab(which){
+    const isFile = which === "file";
+    tabFile.classList.toggle("active", isFile);
+    tabUrl.classList.toggle("active", !isFile);
+    paneFile.classList.toggle("hide", !isFile);
+    paneUrl.classList.toggle("hide", isFile);
+    if(!isFile) setTimeout(()=>urlInput.focus(), 30);
+  }
+  tabFile.onclick = ()=> setSourceTab("file");
+  tabUrl.onclick  = ()=> setSourceTab("url");
+
+  function setOutTab(which){
+    const isPrev = which === "preview";
+    tabPreview.classList.toggle("active", isPrev);
+    tabRaw.classList.toggle("active", !isPrev);
+    if(!hasResult) return;
+
+    // 空结果：无论切到哪个标签，都显示说明卡片，绝不留白
+    if(isEmptyResult){
+      previewPane.classList.add("hide");
+      rawPane.classList.add("hide");
+      emptyPane.classList.remove("hide");
+      return;
+    }
+
+    emptyPane.classList.add("hide");
+    previewPane.classList.toggle("hide", !isPrev);
+    rawPane.classList.toggle("hide", isPrev);
+  }
+  tabPreview.onclick = ()=> setOutTab("preview");
+  tabRaw.onclick     = ()=> setOutTab("raw");
+
+  /* ---------------- 文件选择 ---------------- */
+  function acceptFiles(files){
+    if(!files || !files.length) return;
+    currentFiles = Array.from(files);
+    currentFile = currentFiles.length === 1 ? currentFiles[0] : null;
+    if(currentFiles.length === 1){
+      const f = currentFiles[0];
+      const dotIdx = f.name.lastIndexOf(".");
+      const ext = dotIdx > -1 ? f.name.slice(dotIdx+1) : "file";
+      fileExt.textContent = ext.slice(0,4);
+      fileName.textContent = f.name;
+      fileMeta.textContent = fmtSize(f.size) + " · " + (f.type || "未知类型");
+    } else {
+      const total = currentFiles.reduce((s,f)=>s+f.size, 0);
+      fileExt.textContent = "多";
+      fileName.textContent = currentFiles.length + " 个文件";
+      const sep = optSeparate.checked;
+      fileMeta.textContent = "共 " + fmtSize(total) + " · " + (sep ? "分别保存为 " + currentFiles.length + " 个 .md" : "将合并为一个 Markdown");
+    }
+    fileCard.style.display = "flex";
+    hideAlert();
+  }
+  function clearSelectedFile(){
+    currentFile = null;
+    currentFiles = [];
+    fileInput.value = "";
+    fileCard.style.display = "none";
+  }
+  clearFile.onclick = e => { e.stopPropagation(); clearSelectedFile(); };
+
+  // 切换「分别保存」时同步更新批量提示文字
+  optSeparate.addEventListener("change", function(){
+    if(currentFiles.length > 1){
+      const total = currentFiles.reduce((s,f)=>s+f.size, 0);
+      fileMeta.textContent = "共 " + fmtSize(total) + " · " +
+        (optSeparate.checked ? "分别保存为 " + currentFiles.length + " 个 .md" : "将合并为一个 Markdown");
+    }
+  });
+
+  drop.onclick = ()=> fileInput.click();
+  drop.addEventListener("dragover", e=>{ e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", ()=> drop.classList.remove("drag"));
+  drop.addEventListener("drop", e=>{
+    e.preventDefault(); drop.classList.remove("drag");
+    if(e.dataTransfer.files && e.dataTransfer.files.length){
+      acceptFiles(e.dataTransfer.files);
+      setSourceTab("file");
+    }
+  });
+  fileInput.addEventListener("change", ()=>{
+    if(fileInput.files.length) acceptFiles(fileInput.files);
+  });
+
+  // 全局拖拽
+  window.addEventListener("dragover", e=> e.preventDefault());
+  window.addEventListener("drop", e=>{
+    e.preventDefault();
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+      acceptFiles(e.dataTransfer.files);
+      setSourceTab("file");
+    }
+  });
+  // 粘贴文件
+  window.addEventListener("paste", e=>{
+    const items = e.clipboardData && e.clipboardData.files;
+    if(items && items.length){
+      e.preventDefault();
+      acceptFiles(items);
+      setSourceTab("file");
+      toastMsg("已从剪贴板读取文件");
+    }
+  });
+  // Ctrl+Enter 转换
+  window.addEventListener("keydown", e=>{
+    if((e.ctrlKey||e.metaKey) && e.key === "Enter"){ e.preventDefault(); runConvert(); }
+  });
+
+  /* ---------------- 结果展示 ---------------- */
+  /* 把 Markdown 里的 assets/xxx 相对路径改写成本次结果的实际访问地址 */
+  function mdForPreview(md){
+    let out = String(md);
+    currentAssets.forEach(function(a){
+      out = out.split("](assets/" + a.name + ")").join("](" + a.url + ")");
+      out = out.split("![[" + a.name + "]]").join("![" + a.name + "](" + a.url + ")");
+    });
+    return out;
+  }
+
+  /* 插图资源条：让用户一眼看到哪些图被保留下来了 */
+  function renderAssetStrip(){
+    if(!currentAssets.length){
+      assetStrip.classList.add("hide");
+      assetStrip.innerHTML = "";
+      return;
+    }
+    let html = '<span class="lb">已保留 ' + currentAssets.length + ' 张插图：</span>';
+    currentAssets.forEach(function(a){
+      html += '<a href="' + a.url + '" target="_blank" rel="noopener" title="' +
+              esc(a.name) + ' · ' + fmtSize(a.size) + '">' +
+              '<img src="' + a.url + '" alt="">' + esc(a.name) + '</a>';
+    });
+    assetStrip.innerHTML = html;
+    assetStrip.classList.remove("hide");
+  }
+
+  /* 输出目录提示条 */
+  function renderOutDir(res){
+    if(!res.output_dir){
+      outDirBar.classList.add("hide");
+      outDirPath.textContent = "";
+      return;
+    }
+    outDirPath.textContent = res.output_dir;
+    outDirBar.classList.remove("hide");
+  }
+
+  function clearAssetStrip(){
+    currentCid = null;
+    currentAssets = [];
+    assetStrip.classList.add("hide");
+    assetStrip.innerHTML = "";
+    outDirBar.classList.add("hide");
+    outDirPath.textContent = "";
+    downloadBtn.textContent = "下载 .md";
+    downloadBtn.title = "";
+  }
+
+  openFolderBtn.onclick = function(){
+    if(!currentCid){ toastMsg("还没有转换结果"); return; }
+    fetch("/api/reveal/" + currentCid)
+      .then(function(r){ return r.json(); })
+      .then(function(r){ toastMsg(r.ok ? "已在文件管理器中打开" : ("打开失败：" + (r.error || "目录不存在"))); })
+      .catch(function(err){ toastMsg("打开失败：" + (err && err.message || err)); });
+  };
+
+  function hideAlert(){ alertBox.style.display = "none"; alertDetail.textContent = ""; }
+  function hideWarn(){ warnBox.style.display = "none"; warnMsg.textContent = ""; }
+  function showWarn(title, msg){
+    warnTitle.textContent = title;
+    warnMsg.textContent = msg || "";
+    warnBox.style.display = "block";
+  }
+  function showAlert(title, msg, detail){
+    alertTitle.textContent = title;
+    alertMsg.textContent = msg || "";
+    alertDetail.textContent = detail || "";
+    alertDetail.style.display = detail ? "block" : "none";
+    alertBox.style.display = "block";
+  }
+
+  function showResult(res, srcName){
+    currentMarkdown = res.markdown || "";
+    currentName = (srcName || "output").replace(/\.[^.]+$/, "") || "output";
+    currentCid = res.cid || null;
+    currentAssets = res.assets || [];
+    hasResult = true;
+    isEmptyResult = currentMarkdown.trim().length === 0;
+
+    rawPane.textContent = currentMarkdown;
+    previewPane.innerHTML = isEmptyResult ? "" : renderMarkdown(mdForPreview(currentMarkdown));
+    typesetMath();
+    placeholder.classList.add("hide");
+    renderAssetStrip();
+    renderOutDir(res);
+
+    if(isEmptyResult){
+      const name = srcName || "所选内容";
+      const ext = (String(srcName).split(".").pop() || "").toLowerCase();
+      emptyDesc.innerHTML =
+        "「<b>" + esc(name) + "</b>」已被正常读取（耗时 " + (res.elapsed ?? 0) + "s）。" +
+        (res.ocr_tried
+          ? "已尝试<b>" + engineLabel(res.ocr_engine) + "识别</b>，但这一页仍没有识别出文字（画面可能过于模糊或本身是空白页）。"
+          : "解析出来的内容是空的。这通常不是程序出错，而是文件本身没有可提取的文字。");
+
+      const IMG_EXT = ["png","jpg","jpeg","gif","bmp","tif","tiff","webp"];
+      if(res.ocr_tried){
+        emptyTip.innerHTML = engineLabel(res.ocr_engine) + "已经在这份文件上跑过一遍，仍然没识别出文字。常见原因是：扫描分辨率太低、画面倾斜或模糊，或者这本来就是空白页。换一份更清晰的扫描件试试。" +
+          (res.ocr_error ? "<br><br><b>云 OCR 报错：</b>" + esc(res.ocr_error) : "");
+      } else if(IMG_EXT.indexOf(ext) !== -1 || ext === "pdf"){
+        emptyTip.innerHTML = "这是" + (ext === "pdf" ? "<b>PDF</b>" : "<b>图片</b>") +
+          "，本身没有文字层。请确认左侧的「<b>扫描件自动 OCR</b>」处于勾选状态，再重新转换一次——勾选后会自动调用 OCR 把画面里的文字识别出来。";
+      } else if(["mp3","wav","m4a","flac","aac","ogg"].indexOf(ext) !== -1){
+        emptyTip.innerHTML = "这是<b>音频文件</b>：语音转录需要另外配置识别后端（如 SpeechRecognition），否则结果为空。";
+      } else if(["zip","epub"].indexOf(ext) !== -1){
+        emptyTip.innerHTML = "压缩包 / 电子书里包含的<b>每个子文件都可能没有文字</b>，所以合并结果为空。可以解压后单独转换里面的文件。";
+      } else {
+        emptyTip.innerHTML = "换成带文字内容的文件再试一次。";
+      }
+      copyBtn.disabled = true;
+      downloadBtn.disabled = true;
+    } else {
+      copyBtn.disabled = false;
+      downloadBtn.disabled = false;
+    }
+
+    /* OCR 引擎报错（例如「仅云端」但云端不可用）时给一条不打断流程的提示 */
+    if(res.ocr_error){
+      showWarn("OCR 提示", res.ocr_error);
+    } else if(res.markitdown_error && res.ocr){
+      // markitdown 没有对应转换器（webp / bmp / gif / tif 等图片），已自动改走 OCR
+      showWarn("已自动改用 OCR",
+        "markitdown 内置转换器不支持该格式（" + String(res.markitdown_error).split(":")[0] +
+        "），已自动改由「" + engineLabel(res.ocr_engine) + "」识别图片文字。");
+    } else {
+      hideWarn();
+    }
+
+    setOutTab(tabRaw.classList.contains("active") ? "raw" : "preview");
+
+    downloadBtn.textContent = currentAssets.length ? "下载 .zip" : "下载 .md";
+    downloadBtn.title = currentAssets.length ? "打包下载 Markdown 与全部图片" : "下载 Markdown 文件";
+
+    statOcr.innerHTML = res.ocr
+      ? '<span class="ocr-badge">✓ ' + engineLabel(res.ocr_engine) + ' 识别</span>' : "";
+    statImg.innerHTML = currentAssets.length
+      ? '<span class="img-badge">🖼 保留 ' + currentAssets.length + ' 张图片</span>' : "";
+    statChars.textContent = "字符 " + (res.chars ?? currentMarkdown.length).toLocaleString();
+    statLines.textContent = "行数 " + (res.lines ?? 0).toLocaleString();
+    statTime.textContent  = "耗时 " + (res.elapsed ?? 0) + "s";
+    $("outBody").scrollTop = 0;
+  }
+
+  /* ---------------- 转换主流程 ---------------- */
+  async function runConvert(){
+    if(busy) return;
+
+    const mode = tabUrl.classList.contains("active") ? "url" : "file";
+    const isBatch = (mode === "file" && currentFiles.length > 1);
+
+    if(mode === "file" && currentFiles.length === 0){
+      toastMsg("请先选择一个文件"); return;
+    }
+    if(mode === "url" && !urlInput.value.trim()){
+      toastMsg("请输入要转换的网址"); urlInput.focus(); return;
+    }
+
+    busy = true;
+    hideAlert();
+    hideWarn();
+    convertBtn.disabled = true;
+    btnLabel.textContent = isBatch ? "批量识别中…" : "转换中…";
+    const sp = document.createElement("div");
+    sp.className = "spinner";
+    convertBtn.prepend(sp);
+
+    const opts = {
+      keep_data_uris: optKeepData.checked,
+      use_plugins: optPlugins.checked,
+      enable_ocr: optOcr.checked,
+      keep_images: optKeepImages.checked,
+      ocr_engine: ocrEngine.value,
+      model: ocrEngine.value === "vl" ? ocrModel.value : null
+    };
+
+    try{
+      let resp;
+      let srcName;
+
+      if(mode === "url"){
+        const url = urlInput.value.trim();
+        srcName = url;
+        resp = await fetch("/api/convert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({url}, opts))
+        });
+      } else if(isBatch){
+        // 批量：multipart/form-data 一次上传多个文件，后端逐文件转换后按需合并/分别保存
+        srcName = currentFiles.length + " 个文件";
+        const fd = new FormData();
+        currentFiles.forEach(f => fd.append("files", f, f.name));
+        fd.append("enable_ocr", opts.enable_ocr ? "true" : "false");
+        fd.append("keep_data_uris", opts.keep_data_uris ? "true" : "false");
+        fd.append("use_plugins", opts.use_plugins ? "true" : "false");
+        fd.append("keep_images", opts.keep_images ? "true" : "false");
+        fd.append("ocr_engine", opts.ocr_engine);
+        if(opts.model) fd.append("model", opts.model);
+        fd.append("separate", optSeparate.checked ? "true" : "false");
+        resp = await fetch("/api/convert-batch", { method: "POST", body: fd });
+      } else {
+        srcName = currentFile.name;
+        resp = await fetch("/api/convert", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-Filename": encodeURIComponent(currentFile.name),
+            "X-Options": JSON.stringify(opts)
+          },
+          body: currentFile
+        });
+      }
+
+      const data = await resp.json();
+
+      if(data.ok){
+        showResult(data, srcName);
+        const imgN = (data.assets || []).length;
+        const saved = data.output_dir ? " · 已存到 output/" : "";
+        if(isBatch){
+          const n = (data.output_files || []).length;
+          if(data.ok_count === 0 && data.ocr_error){
+            toastMsg("识别失败 · " + data.ocr_error);
+          } else if(data.separate){
+            toastMsg("分别保存完成 · " + data.ok_count + "/" + data.total + " 张识别出文字 · 生成 " + n + " 个 .md · " + data.elapsed + "s");
+          } else {
+            toastMsg("批量识别完成 · " + data.ok_count + "/" + data.total + " 张识别出文字 · " + data.elapsed + "s");
+          }
+        } else {
+          toastMsg(data.ocr
+            ? engineLabel(data.ocr_engine) + " 识别完成 · " + data.elapsed + "s" + (imgN ? " · 保留 " + imgN + " 张图片" : "") + saved
+            : (data.empty || !data.markdown) ? "转换完成，但没有提取到文本"
+            : "转换完成 · " + data.elapsed + "s" + (imgN ? " · 保留 " + imgN + " 张图片" : "") + saved);
+        }
+      } else {
+        hasResult = false;
+        isEmptyResult = false;
+        clearAssetStrip();
+        placeholder.classList.remove("hide");
+        previewPane.classList.add("hide");
+        rawPane.classList.add("hide");
+        emptyPane.classList.add("hide");
+        showAlert("转换失败", data.error || "未知错误", data.detail || "");
+        toastMsg("转换失败");
+      }
+    } catch(err){
+      hasResult = false;
+      isEmptyResult = false;
+      clearAssetStrip();
+      placeholder.classList.remove("hide");
+      previewPane.classList.add("hide");
+      rawPane.classList.add("hide");
+      emptyPane.classList.add("hide");
+      showAlert("请求出错", String(err && err.message || err), "");
+      toastMsg("请求出错");
+    } finally {
+      sp.remove();
+      btnLabel.textContent = "开始转换";
+      convertBtn.disabled = false;
+      busy = false;
+    }
+  }
+  convertBtn.onclick = runConvert;
+
+  /* ---------------- 复制 / 下载 ---------------- */
+  copyBtn.onclick = async ()=>{
+    if(!currentMarkdown) return;
+    try{
+      await navigator.clipboard.writeText(currentMarkdown);
+      toastMsg("已复制到剪贴板");
+    }catch{
+      const ta = document.createElement("textarea");
+      ta.value = currentMarkdown;
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove();
+      toastMsg("已复制到剪贴板");
+    }
+  };
+
+  downloadBtn.onclick = ()=>{
+    if(!currentMarkdown) return;
+
+    // 有插图时打包下载，保证 Markdown 里的相对引用能对应上文件
+    if(currentCid && currentAssets.length){
+      const link = document.createElement("a");
+      link.href = "/api/package/" + currentCid;
+      link.download = currentName + ".zip";
+      document.body.appendChild(link); link.click();
+      setTimeout(()=>link.remove(), 500);
+      toastMsg("已打包 · 含 " + currentAssets.length + " 张图片");
+      return;
+    }
+
+    const blob = new Blob([currentMarkdown], {type:"text/markdown;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = currentName + ".md";
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  };
+
+  /* ---------------- 服务状态 ---------------- */
+  fetch("/api/info").then(r=>r.json()).then(info=>{
+    dot.classList.add("on");
+    statusText.textContent = "服务正常";
+    verBadge.textContent = "markitdown v" + info.markitdown;
+    verBadge.title = "Python " + info.python;
+    applyEngine(info);
+  }).catch(()=>{
+    statusText.textContent = "服务未连接";
+  });
+})();
+</script>
+</body>
+</html>

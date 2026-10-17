@@ -1,360 +1,99 @@
-# MarkItDown
+﻿# MarkItDown Notes WebUI
 
-[![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
-![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
-[![Built by AutoGen Team](https://img.shields.io/badge/Built%20by-AutoGen%20Team-blue)](https://github.com/microsoft/autogen)
+面向学习资料和手写笔记整理的本地文档转换工具：在浏览器中上传文件，转换为 Markdown，并将结果与图片资源导入 Obsidian。
 
-> [!IMPORTANT]
-> MarkItDown performs I/O with the privileges of the current process. Like open() or requests.get(), it will access resources that the process itself can access. Sanitize your inputs in untrusted environments, and call the narrowest `convert_*` function needed for your use case (e.g., `convert_stream()`, or `convert_local()`). See the [Security Considerations](#security-considerations) section of the documentation for more information.
+本项目基于微软开源项目 [MarkItDown v0.1.7](https://github.com/microsoft/markitdown/tree/v0.1.7) 二次开发。核心文档解析与多格式转换来自上游；本仓库主要扩展本地 Web 界面、OCR 接入、手写公式转写和笔记导出流程。
 
-MarkItDown is a lightweight Python utility for converting various files to Markdown for use with LLMs and related text analysis pipelines. To this end, it is most comparable to [textract](https://github.com/deanmalmgren/textract), but with a focus on preserving important document structure and content as Markdown (including: headings, lists, tables, links, etc.) While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools -- and may not be the best option for high-fidelity document conversions for human consumption.
+## 功能
 
-MarkItDown currently supports the conversion from:
+- **浏览器操作**：拖拽上传、Markdown 与数学公式预览、复制和下载结果。
+- **批量转换**：多个文件合并为一份 Markdown，或分别保存，并查看逐文件处理结果。
+- **扫描件识别**：接入 RapidOCR 本地识别、腾讯云 OCR 和智谱视觉模型，提供 `auto`、`local`、`cloud`、`vl` 四种模式。
+- **手写公式转写**：通过视觉模型输出 LaTeX，处理图片方向和模型输出长度限制。
+- **笔记资源管理**：导出 Markdown 与 `assets/` 图片，支持 Obsidian 图片引用和 ZIP 打包。
 
-- PDF
-- PowerPoint
-- Word
-- Excel
-- Images (EXIF metadata and OCR)
-- Audio (EXIF metadata and speech transcription)
-- HTML
-- Text-based formats (CSV, JSON, XML)
-- ZIP files (iterates over contents)
-- YouTube URLs
-- EPubs
-- ... and more!
+## 处理流程
 
-## Why Markdown?
+```text
+文件上传 → MarkItDown 转换 → 文字提取不足时进入 OCR
+                              ├─ local：RapidOCR
+                              ├─ cloud：腾讯云 OCR
+                              ├─ auto：腾讯云优先，失败转本地
+                              └─ vl：智谱视觉模型，输出 Markdown / LaTeX
+         → 浏览器预览 → Markdown / 图片资源 / ZIP 导出
+```
 
-Markdown is extremely close to plain text, with minimal markup or formatting, but still
-provides a way to represent important document structure. Mainstream LLMs, such as
-OpenAI's GPT-4o, natively "_speak_" Markdown, and often incorporate Markdown into their
-responses unprompted. This suggests that they have been trained on vast amounts of
-Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
-are also highly token-efficient.
+## 快速开始
 
-## Prerequisites
-MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
+需要 Python 3.10 或更高版本。以下命令在项目根目录执行。
 
-With the standard Python installation, you can create and activate a virtual environment using the following commands:
-
-```bash
+```powershell
+git clone https://github.com/godweimd/markitdown-notes-webui.git
+cd markitdown-notes-webui
 python -m venv .venv
-source .venv/bin/activate
+.\.venv\Scripts\python.exe -m pip install -e "packages/markitdown[pdf,docx,pptx,xlsx]"
+.\.venv\Scripts\python.exe webui/server.py
 ```
 
-If using `uv`, you can create a virtual environment with:
+浏览器会打开 `http://127.0.0.1:8765`；如果端口已占用，以启动日志显示的地址为准。完成环境安装后，Windows 下也可双击 `start_webui.bat`。
 
-```bash
-uv venv --python=3.12 .venv
-source .venv/bin/activate
-# NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
+Linux / macOS 可用 `python3 -m venv .venv` 创建环境，并将后续命令中的 Python 路径替换为 `.venv/bin/python`。
+
+### 本地 OCR（可选）
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install rapidocr-onnxruntime pymupdf numpy pillow
 ```
 
-If you are using Anaconda, you can create a virtual environment with:
+在界面中选择 `local`。该识别路径不需要云端密钥，文档内容无需发送至识别服务。
 
-```bash
-conda create -n markitdown python=3.12
-conda activate markitdown
+### 云端 OCR / 视觉模型（可选）
+
+安装图片与 PDF 处理依赖：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install pymupdf pillow
 ```
 
-## Installation
+| 模式 | 配置方式 |
+| --- | --- |
+| `cloud` | 复制 `webui/tencent_config.example.json` 为 `webui/tencent_config.json`，填入自己的腾讯云密钥 |
+| `vl` | 复制 `webui/zhipu_config.example.json` 为 `webui/zhipu_config.json`，填入自己的智谱 API Key |
+| `auto` | 腾讯云可用时优先调用，失败后尝试本地 RapidOCR |
 
-To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
+云端模式会向相应服务商发送图片或页面内容，可能产生 API 费用；模型可用性和计费以服务商为准。真实配置文件已被 `.gitignore` 排除，仓库仅包含空密钥模板。
 
-```bash
-git clone git@github.com:microsoft/markitdown.git
-cd markitdown
-pip install -e 'packages/markitdown[all]'
+### 导出到 Obsidian
+
+```powershell
+.\.venv\Scripts\python.exe webui/server.py --output "D:/你的知识库/导入资料"
 ```
 
-## Usage
+默认输出目录为项目根目录下的 `output/`。建议使用单独的导入目录；重复使用同一输出名称会覆盖对应结果和导出的图片。
 
-### Command-Line
+## 二次开发范围
 
-```bash
-markitdown path-to-file.pdf > document.md
-```
+| 内容 | 来源 / 作用 |
+| --- | --- |
+| `packages/markitdown*` | 上游转换引擎、MCP、OCR 插件和示例插件；保留原作者信息 |
+| `webui/server.py` | Python 标准库 HTTP 服务，上传解析、转换入口、批量处理与文件导出 |
+| `webui/index.html` | 浏览器界面、识别选项、Markdown 与公式预览 |
+| `webui/ocr_fallback.py` | OCR 模式调度、PDF 页面渲染、文字与插图排版 |
+| `webui/tencent_ocr.py` | 腾讯云请求签名、图片预处理与识别结果转换 |
+| `webui/zhipu_vl.py` | 视觉模型接入、方向处理、公式转写和输出截断续写 |
+| `start_webui.bat` | Windows 启动入口 |
 
-Or use `-o` to specify the output file:
+更多界面说明见 [webui/README.md](webui/README.md)，上游说明保留在 [README.upstream.md](README.upstream.md)。
 
-```bash
-markitdown path-to-file.pdf -o document.md
-```
+## 验证情况与限制
 
-You can also pipe content:
+- 已完成离线检查：中文文本、HTML、DOCX、PDF 转换，以及两文件批量转换与 Markdown 落盘。
+- 云端 OCR、视觉模型、本地 OCR 的识别质量尚未完成本次发布的系统评测，不提供准确率或性能提升承诺。
+- OCR 补充由提取文本长度阈值触发，可能遗漏文字层较多但仍含扫描内容的混合 PDF；当前逐页识别上限为 60 页。
+- 公式转写依赖模型输出，需要人工核对；达到续写上限时仍可能不完整。
+- 这是本地运行的工具，默认只监听 `127.0.0.1`；当前没有用户鉴权，不应直接暴露到公网。
+- 公式预览依赖在线加载 MathJax；该页面资源与本地 OCR 识别本身是不同的联网环节。
 
-```bash
-cat path-to-file.pdf | markitdown
-```
+## 许可与致谢
 
-### Optional Dependencies
-MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
-
-```bash
-pip install 'markitdown[pdf, docx, pptx]'
-```
-
-will install only the dependencies for PDF, DOCX, and PPTX files.
-
-At the moment, the following optional dependencies are available:
-
-* `[all]` Installs all optional dependencies
-* `[pptx]` Installs dependencies for PowerPoint files
-* `[docx]` Installs dependencies for Word files
-* `[xlsx]` Installs dependencies for Excel files
-* `[xls]` Installs dependencies for older Excel files
-* `[pdf]` Installs dependencies for PDF files
-* `[outlook]` Installs dependencies for Outlook messages
-* `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
-* `[az-content-understanding]` Installs dependencies for Azure Content Understanding
-* `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
-* `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
-
-### Plugins
-
-MarkItDown also supports 3rd-party plugins. Plugins are disabled by default. To list installed plugins:
-
-```bash
-markitdown --list-plugins
-```
-
-To enable plugins use:
-
-```bash
-markitdown --use-plugins path-to-file.pdf
-```
-
-To find available plugins, search GitHub for the hashtag `#markitdown-plugin`. To develop a plugin, see `packages/markitdown-sample-plugin`.
-
-#### markitdown-ocr Plugin
-
-The `markitdown-ocr` plugin adds OCR support to PDF, DOCX, PPTX, and XLSX converters, extracting text from embedded images using LLM Vision — the same `llm_client` / `llm_model` pattern that MarkItDown already uses for image descriptions. No new ML libraries or binary dependencies required.
-
-**Installation:**
-
-```bash
-pip install markitdown-ocr
-pip install openai  # or any OpenAI-compatible client
-```
-
-**Usage:**
-
-Pass the same `llm_client` and `llm_model` you would use for image descriptions:
-
-```python
-from markitdown import MarkItDown
-from openai import OpenAI
-
-md = MarkItDown(
-    enable_plugins=True,
-    llm_client=OpenAI(),
-    llm_model="gpt-4o",
-)
-result = md.convert("document_with_images.pdf")
-print(result.text_content)
-```
-
-If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
-
-See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation.
-
-### Azure Content Understanding
-
-[Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and configurable analyzers.
-
-Install: `pip install 'markitdown[az-content-understanding]'`
-
-#### When to use Content Understanding
-
-Content Understanding is ideal when you need capabilities beyond what built-in or Document Intelligence converters provide:
-
-- **Audio and video files** — CU is the only option for video, and the higher-quality cloud option for audio. Built-in converters have no video support and only basic audio transcription.
-- **Structured field extraction** — [Prebuilt](https://learn.microsoft.com/azure/ai-services/content-understanding/concepts/prebuilt-analyzers) or [custom-built](https://learn.microsoft.com/azure/ai-services/content-understanding/how-to/customize-analyzer-content-understanding-studio?tabs=portal) analyzers extract domain-specific fields (invoice amounts, receipt dates, contract clauses) serialized as YAML front matter. Neither built-in nor Doc Intel integration exposes fields.
-- **Higher-quality document extraction** — Cloud-based layout analysis and OCR for scanned PDFs, complex tables, and multi-page documents.
-- **Single API for all modalities** — One `cu_endpoint` handles documents, images, audio, and video with automatic analyzer routing.
-
-| Capability | Built-in converters | Azure Document Intelligence | Azure Content Understanding |
-|------------|---------------------|-----------------------------|-----------------------------|
-| Document conversion | Offline, format-specific extraction | Cloud layout extraction | Cloud multimodal extraction |
-| Structured fields | Not available | Not exposed by this integration | YAML front matter from analyzer fields |
-| Custom analyzers | Not available | Not configurable in this integration | Supported with `cu_analyzer_id` |
-| Audio and video | Basic audio, no video | Not supported | Audio and video analyzers |
-| Cost | Local compute only | Billable Azure API calls | Billable Azure API calls |
-
-**CLI:**
-
-```bash
-markitdown path-to-file.pdf --use-cu --cu-endpoint "<content_understanding_endpoint>"
-```
-
-**Python API:**
-
-```python
-from markitdown import MarkItDown
-
-# Zero-config — auto-selects analyzer per file type
-md = MarkItDown(cu_endpoint="<content_understanding_endpoint>")
-result = md.convert("report.pdf")   # documents → prebuilt-documentSearch
-result = md.convert("meeting.mp4")  # video → prebuilt-videoSearch
-result = md.convert("call.wav")     # audio → prebuilt-audioSearch
-print(result.markdown)
-```
-
-**With a custom analyzer** (for domain-specific field extraction):
-
-```python
-md = MarkItDown(
-    cu_endpoint="<content_understanding_endpoint>",
-    cu_analyzer_id="my-invoice-analyzer",
-)
-result = md.convert("invoice.pdf")
-print(result.markdown)
-# Output includes YAML front matter with extracted fields:
-# ---
-# contentType: document
-# fields:
-#   VendorName: CONTOSO LTD.
-#   InvoiceDate: '2019-11-15'
-# ---
-# <!-- page 1 -->
-# ...
-```
-
-When `cu_analyzer_id` is set, the converter automatically scopes it to compatible file types based on the analyzer's modality. Incompatible types (e.g., audio files with a document analyzer) auto-route to default prebuilt analyzers.
-
-**Cost note:** Each `convert()` call for a CU-routed format is a billable Azure API call. Use `cu_file_types` to restrict which formats route to CU:
-
-```python
-from markitdown.converters import ContentUnderstandingFileType
-
-md = MarkItDown(
-    cu_endpoint="<content_understanding_endpoint>",
-    cu_file_types=[ContentUnderstandingFileType.PDF],  # only PDFs use CU
-)
-```
-
-More information about Azure Content Understanding can be found [here](https://learn.microsoft.com/azure/ai-services/content-understanding/).
-
-### Azure Document Intelligence
-
-To use Microsoft Document Intelligence for conversion:
-
-```bash
-markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
-```
-
-More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
-
-### Python API
-
-Basic usage in Python:
-
-```python
-from markitdown import MarkItDown
-
-md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
-result = md.convert("test.xlsx")
-print(result.text_content)
-```
-
-Document Intelligence conversion in Python:
-
-```python
-from markitdown import MarkItDown
-
-md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
-result = md.convert("test.pdf")
-print(result.text_content)
-```
-
-To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
-
-```python
-from markitdown import MarkItDown
-from openai import OpenAI
-
-client = OpenAI()
-md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
-result = md.convert("example.jpg")
-print(result.text_content)
-```
-
-### Docker
-
-```sh
-docker build -t markitdown:latest .
-docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
-```
-
-## Contributing
-
-This project welcomes contributions and suggestions. Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-### How to Contribute
-
-You can help by looking at issues or helping review PRs. Any issue or PR is welcome, but we have also marked some as 'open for contribution' and 'open for reviewing' to help facilitate community contributions. These are of course just suggestions and you are welcome to contribute in any way you like.
-
-<div align="center">
-
-|            | All                                                          | Especially Needs Help from Community                                                                                                      |
-| ---------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Issues** | [All Issues](https://github.com/microsoft/markitdown/issues) | [Issues open for contribution](https://github.com/microsoft/markitdown/issues?q=is%3Aissue+is%3Aopen+label%3A%22open+for+contribution%22) |
-| **PRs**    | [All PRs](https://github.com/microsoft/markitdown/pulls)     | [PRs open for reviewing](https://github.com/microsoft/markitdown/pulls?q=is%3Apr+is%3Aopen+label%3A%22open+for+reviewing%22)              |
-
-</div>
-
-### Running Tests and Checks
-
-- Navigate to the MarkItDown package:
-
-  ```sh
-  cd packages/markitdown
-  ```
-
-- Install `hatch` in your environment and run tests:
-
-  ```sh
-  pip install hatch  # Other ways of installing hatch: https://hatch.pypa.io/dev/install/
-  hatch shell
-  hatch test
-  ```
-
-  (Alternative) Use the Devcontainer which has all the dependencies installed:
-
-  ```sh
-  # Reopen the project in Devcontainer and run:
-  hatch test
-  ```
-
-- Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
-
-### Security Considerations
-
-MarkItDown performs I/O with the privileges of the current process. Like `open()` or `requests.get()`, it will access resources that the process itself can access.
-
-**Sanitize your inputs:** Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled by an untrusted user or system, such as in hosted or server-side applications, it must be validated and restricted before calling MarkItDown. Depending on your environment, this may include restricting file paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local, or metadata-service addresses.
-
-**Call only the conversion method you need:** Prefer the narrowest conversion API that fits your use case. MarkItDown's `convert()` method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your application only needs to read local files, call `convert_local()` instead. If you need more control over URI fetching, call `requests.get()` yourself and pass the response object to `convert_response()`. For maximum control, open a stream to the input you want converted and call `convert_stream()`.
-
-### Contributing 3rd-party Plugins
-
-You can also contribute by creating and sharing 3rd party plugins. See `packages/markitdown-sample-plugin` for more details.
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+沿用 [MIT License](LICENSE)，保留 Microsoft Corporation 及上游贡献者的版权声明。感谢 [microsoft/markitdown](https://github.com/microsoft/markitdown)；本项目与微软官方无隶属关系。
